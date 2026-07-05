@@ -110,7 +110,7 @@ Write-Host "index.js baixado com sucesso"
 ###########################################
 Write-Host "Gerando SSL..."
 Set-Location $InstallPath
-npm install selfsigned --no-save --silent
+npm install selfsigned@5.5.0 --no-save --silent
 
 $certScript = @'
 (async () => {
