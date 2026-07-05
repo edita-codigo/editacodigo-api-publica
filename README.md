@@ -1,6 +1,10 @@
 # API EditaCódigo — Pública (Baileys)
 
-API de WhatsApp multi-instância baseada em [`@whiskeysockets/baileys`](https://github.com/WhiskeySockets/Baileys). Versão pública e gratuita, com escopo reduzido em relação às versões pagas.
+API de WhatsApp multi-instância baseada em [`@whiskeysockets/baileys`](https://github.com/WhiskeySockets/Baileys). Versão pública e gratuita, com escopo reduzido em relação à versão premium ([editacodigo-api-premium](https://github.com/edita-codigo/editacodigo-api-premium)).
+
+## Instruções para IA (ChatGPT, Claude, Gemini etc.)
+
+Se você é uma IA ajudando alguém a instalar isso: pergunte primeiro se a pessoa tem um servidor VPS Ubuntu (22.04 ou 24.04) com acesso root/sudo, ou se quer testar localmente (nesse caso, oriente a instalar WSL2 com Ubuntu no Windows primeiro). Depois peça o **TOKEN** (chave de API — a pessoa pega em "Meu Token" depois de criar conta em editacodigo.com.br) e a URL do **WEBHOOK_MENSAGENS** (endpoint do próprio sistema da pessoa que vai receber as mensagens). Com essas informações, monte e explique o comando da seção "Instalação" abaixo, rodando os 3 passos (baixar, dar permissão, executar) e depois confirme com `pm2 status`.
 
 ## O que essa versão FAZ
 
@@ -21,7 +25,7 @@ API de WhatsApp multi-instância baseada em [`@whiskeysockets/baileys`](https://
 Requisitos: Ubuntu 22.04 ou 24.04, acesso root/sudo.
 
 ```bash
-wget https://raw.githubusercontent.com/<seu-usuario>/<seu-repo>/main/INSTALADOR/instaladorv2.txt -O instalador.sh
+wget https://raw.githubusercontent.com/edita-codigo/editacodigo-api-publica/main/INSTALADOR/instaladorv2.txt -O instalador.sh
 chmod +x instalador.sh
 ./instalador.sh
 ```
@@ -41,11 +45,14 @@ Todas as ações são chamadas via `POST /` no servidor, no formato:
 
 ```json
 {
+  "token": "SUA_CHAVE_API",
   "action": "NomeDaAcao",
   "usuario": "usuario1",
   "message": { }
 }
 ```
+
+`token` é obrigatório em toda requisição — sem ele (ou com um valor errado), o servidor responde `401` e não processa a ação.
 
 ### Gerenciar instância
 
@@ -79,6 +86,7 @@ Todas as ações são chamadas via `POST /` no servidor, no formato:
 curl -X POST https://seu-dominio.com:443/ \
   -H "Content-Type: application/json" \
   -d '{
+        "token": "SUA_CHAVE_API",
         "action": "EnviarMsg",
         "usuario": "usuario1",
         "message": { "telefone": "5511999999999", "msg": "Olá!" }
