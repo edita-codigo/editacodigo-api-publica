@@ -128,7 +128,7 @@ sudo chown -R "$USER":"$USER" "$INSTALL_PATH"
 # 7. BAIXA INDEX.JS
 ###########################################
 echo "⬇️  Baixando index.js..."
-wget -O "$INSTALL_PATH/index.js" "https://tasmota.com.br/api/publica/index.js"
+wget -O "$INSTALL_PATH/index.js" "https://raw.githubusercontent.com/edita-codigo/editacodigo-api-publica/master/VPS/index.js"
 
 if [ ! -f "$INSTALL_PATH/index.js" ]; then
   echo "❌ Erro ao baixar index.js"

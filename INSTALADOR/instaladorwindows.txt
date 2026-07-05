@@ -97,7 +97,7 @@ New-Item -ItemType Directory -Force -Path (Join-Path $InstallPath "sessions") | 
 # 6. BAIXA INDEX.JS
 ###########################################
 Write-Host "Baixando index.js..."
-Invoke-WebRequest -Uri "https://tasmota.com.br/api/publica/index.js" -OutFile (Join-Path $InstallPath "index.js")
+Invoke-WebRequest -Uri "https://raw.githubusercontent.com/edita-codigo/editacodigo-api-publica/master/VPS/index.js" -OutFile (Join-Path $InstallPath "index.js")
 
 if (-not (Test-Path (Join-Path $InstallPath "index.js"))) {
     Write-Host "ERRO ao baixar index.js"
