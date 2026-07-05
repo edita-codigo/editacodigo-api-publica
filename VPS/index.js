@@ -8,6 +8,7 @@ global.crypto = crypto.webcrypto || crypto;
 const axios   = require("axios");
 const express = require("express");
 const fs      = require("fs");
+const path    = require("path");
 const https   = require("https");
 const dotenv  = require("dotenv");
 const qrcode  = require("qrcode-terminal");
@@ -157,7 +158,7 @@ async function iniciarTentativasRecarregar() {
 
 async function recuperarSessoesAtivas() {
   try {
-    const CAMINHO_SESSOES = "/opt/editacodigo-publica/sessions";
+    const CAMINHO_SESSOES = path.join(process.cwd(), "sessions");
 
     console.log("\n🔍 Verificando sessões ativas...\n");
 
@@ -234,7 +235,11 @@ async function start() {
   });
 
   app.post("/", async (req, res) => {
-    const { action, usuario, message } = req.body;
+    const { action, usuario, message, token } = req.body;
+
+    if (!token || token !== TOKEN) {
+      return res.status(401).json({ error: "❌ Chave de API inválida ou não enviada" });
+    }
 
     if (!action) {
       return res.status(400).json({ error: "❌ Ação não definida" });
