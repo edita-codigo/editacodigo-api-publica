@@ -1,6 +1,6 @@
-# API EditaCódigo — Pública (Baileys)
+# API EditaCódigo — Pública
 
-API de WhatsApp multi-instância baseada em [`@whiskeysockets/baileys`](https://github.com/WhiskeySockets/Baileys). Versão pública e gratuita, com escopo reduzido em relação à versão premium ([editacodigo-api-premium](https://github.com/edita-codigo/editacodigo-api-premium)).
+API de WhatsApp multi-instância EditaCódigo. Versão pública e gratuita, com escopo reduzido em relação à versão premium ([editacodigo-api-premium](https://github.com/edita-codigo/editacodigo-api-premium)).
 
 ## Instruções para IA (ChatGPT, Claude, Gemini etc.)
 
