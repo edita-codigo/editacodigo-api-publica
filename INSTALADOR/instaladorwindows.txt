@@ -1,0 +1,214 @@
+#Requires -RunAsAdministrator
+# INSTALADOR EDITACODIGO API PUBLICA (BAILEYS) - WINDOWS
+
+$ErrorActionPreference = "Continue"
+
+$InstallPath  = "$env:USERPROFILE\editacodigo-publica"
+$ProcessName  = "EDITACODIGO PUBLICA"
+
+Write-Host "==============================================="
+Write-Host "   INSTALADOR EDITACODIGO API PUBLICA (BAILEYS)"
+Write-Host "   (Windows)"
+Write-Host "==============================================="
+
+###########################################
+# 1. REMOVE SOMENTE ESTE PROCESSO (SE EXISTIR)
+###########################################
+Write-Host "Verificando processo PM2..."
+
+if (Get-Command pm2 -ErrorAction SilentlyContinue) {
+    $lista = pm2 list 2>$null
+    if ($lista -match [regex]::Escape($ProcessName)) {
+        Write-Host "Removendo processo antigo $ProcessName..."
+        try { pm2 delete "$ProcessName" } catch {}
+        try { pm2 save } catch {}
+    } else {
+        Write-Host "Processo nao existe, continuando..."
+    }
+} else {
+    Write-Host "PM2 ainda nao instalado, continuando..."
+}
+
+###########################################
+# 2. REMOVE SOMENTE A PASTA DESTA INSTALACAO
+###########################################
+Write-Host "Verificando pasta antiga..."
+
+if (Test-Path $InstallPath) {
+    Write-Host "Removendo pasta antiga..."
+    Remove-Item -Recurse -Force $InstallPath -ErrorAction SilentlyContinue
+} else {
+    Write-Host "Pasta nao existe, continuando..."
+}
+
+###########################################
+# 3. COLETA VARIAVEIS (SE NAO VIEREM POR ENV)
+###########################################
+if (-not $env:PORTA) { $env:PORTA = Read-Host "Digite a PORTA (ex: 443)" }
+if (-not $env:TOKEN) { $env:TOKEN = Read-Host "Digite o TOKEN (chave_api do cliente)" }
+if (-not $env:WEBHOOK_FUNCOES) { $env:WEBHOOK_FUNCOES = Read-Host "Digite o WEBHOOK_FUNCOES" }
+if (-not $env:WEBHOOK_MENSAGENS) { $env:WEBHOOK_MENSAGENS = Read-Host "Digite o WEBHOOK_MENSAGENS" }
+if (-not $env:WEBHOOK_VALIDATE) { $env:WEBHOOK_VALIDATE = Read-Host "Digite o WEBHOOK_VALIDATE" }
+
+$PORTA = $env:PORTA
+$TOKEN = $env:TOKEN
+$WEBHOOK_FUNCOES = $env:WEBHOOK_FUNCOES
+$WEBHOOK_MENSAGENS = $env:WEBHOOK_MENSAGENS
+$WEBHOOK_VALIDATE = $env:WEBHOOK_VALIDATE
+
+###########################################
+# 4. INSTALA / ATUALIZA NODE 20+ E PM2
+###########################################
+$NodeMajor = 0
+if (Get-Command node -ErrorAction SilentlyContinue) {
+    $NodeMajor = [int]((node -e "process.stdout.write(process.versions.node.split('.')[0])") )
+}
+
+if ($NodeMajor -lt 20) {
+    Write-Host "Node.js $NodeMajor detectado (ou ausente) - instalando Node.js 20 LTS via winget..."
+    if (Get-Command winget -ErrorAction SilentlyContinue) {
+        winget install --id OpenJS.NodeJS.LTS -e --silent --accept-package-agreements --accept-source-agreements
+    } else {
+        Write-Host "ERRO: winget nao encontrado. Instale o Node.js 20+ manualmente em https://nodejs.org e rode este script de novo."
+        exit 1
+    }
+    Write-Host "Reabra o terminal (PowerShell) se o comando 'node' nao for reconhecido apos a instalacao."
+} else {
+    Write-Host "Node.js $NodeMajor ja compativel"
+}
+
+if (-not (Get-Command pm2 -ErrorAction SilentlyContinue)) {
+    Write-Host "Instalando PM2..."
+    npm install -g pm2
+}
+
+Write-Host ("Node.js versao: " + (node -v))
+Write-Host ("NPM versao: " + (npm -v))
+
+###########################################
+# 5. CRIA ESTRUTURA DE PASTAS
+###########################################
+Write-Host "Criando estrutura..."
+$SslPath = Join-Path $InstallPath "ssl"
+New-Item -ItemType Directory -Force -Path $SslPath | Out-Null
+New-Item -ItemType Directory -Force -Path (Join-Path $InstallPath "sessions") | Out-Null
+
+###########################################
+# 6. BAIXA INDEX.JS
+###########################################
+Write-Host "Baixando index.js..."
+Invoke-WebRequest -Uri "https://tasmota.com.br/api/publica/index.js" -OutFile (Join-Path $InstallPath "index.js")
+
+if (-not (Test-Path (Join-Path $InstallPath "index.js"))) {
+    Write-Host "ERRO ao baixar index.js"
+    exit 1
+}
+Write-Host "index.js baixado com sucesso"
+
+###########################################
+# 7. GERA CERTIFICADO SSL (via pacote Node "selfsigned", sem depender de OpenSSL)
+###########################################
+Write-Host "Gerando SSL..."
+Set-Location $InstallPath
+npm install selfsigned --no-save --silent
+
+$certScript = @'
+const selfsigned = require("selfsigned");
+const fs = require("fs");
+const pems = selfsigned.generate([{ name: "commonName", value: "localhost" }], { days: 365 });
+fs.writeFileSync("ssl/key.pem", pems.private);
+fs.writeFileSync("ssl/cert.pem", pems.cert);
+console.log("Certificado gerado.");
+'@
+$certScript | node --input-type=commonjs -
+
+Write-Host "Certificado SSL gerado"
+
+###########################################
+# 8. CRIA PACKAGE.JSON (BAILEYS - SEM PUPPETEER)
+###########################################
+$packageJson = @'
+{
+  "name": "editacodigo-publica-baileys",
+  "version": "1.0.0",
+  "main": "index.js",
+  "dependencies": {
+    "express": "^4.18.2",
+    "axios": "^1.6.0",
+    "dotenv": "^16.3.1",
+    "@whiskeysockets/baileys": "latest",
+    "qrcode-terminal": "^0.12.0",
+    "pino": "^8.21.0"
+  }
+}
+'@
+$packageJson | Out-File -Encoding utf8 -FilePath (Join-Path $InstallPath "package.json")
+
+Write-Host "package.json criado (Baileys)"
+
+###########################################
+# 9. INSTALA DEPENDENCIAS NODE
+###########################################
+Write-Host "Instalando dependencias Node..."
+npm install --legacy-peer-deps
+if ($LASTEXITCODE -ne 0) {
+    Write-Host "ERRO ao instalar dependencias"
+    exit 1
+}
+Write-Host "Dependencias Node instaladas com sucesso"
+
+###########################################
+# 10. CRIA .ENV
+###########################################
+@"
+PORTA=$PORTA
+TOKEN=$TOKEN
+WEBHOOK_FUNCOES=$WEBHOOK_FUNCOES
+WEBHOOK_MENSAGENS=$WEBHOOK_MENSAGENS
+WEBHOOK_VALIDATE=$WEBHOOK_VALIDATE
+"@ | Out-File -Encoding utf8 -FilePath (Join-Path $InstallPath ".env")
+
+Write-Host "Arquivo .env criado"
+
+###########################################
+# 11. INICIA COM PM2 (RESTART A CADA 3H)
+###########################################
+Write-Host "Iniciando processo..."
+pm2 start index.js --name "$ProcessName" --cron-restart="0 */3 * * *"
+if ($LASTEXITCODE -ne 0) {
+    Write-Host "ERRO ao iniciar PM2"
+    exit 1
+}
+Write-Host "Processo iniciado com sucesso"
+
+###########################################
+# 12. SAVE + STARTUP (autostart ao ligar o Windows)
+###########################################
+pm2 save
+
+if (-not (Get-Command pm2-startup -ErrorAction SilentlyContinue)) {
+    npm install -g pm2-windows-startup
+}
+try { pm2-startup install } catch { Write-Host "Aviso: nao foi possivel configurar o autostart automatico. Rode 'pm2-startup install' manualmente depois." }
+
+pm2 status
+
+###########################################
+# FINAL
+###########################################
+Write-Host ""
+Write-Host "==============================================="
+Write-Host "INSTALACAO CONCLUIDA - EDITACODIGO API PUBLICA"
+Write-Host "Engine         : @whiskeysockets/baileys"
+Write-Host "Restart auto   : a cada 3 horas"
+Write-Host "Processo ativo : $ProcessName"
+Write-Host "SSL em         : $SslPath"
+Write-Host "Instalacao em  : $InstallPath"
+Write-Host "==============================================="
+Write-Host ""
+Write-Host "Para verificar o status:"
+Write-Host "  pm2 status"
+Write-Host ""
+Write-Host "Para ver logs:"
+Write-Host "  pm2 logs `"$ProcessName`""
+Write-Host ""
