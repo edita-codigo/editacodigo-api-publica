@@ -113,15 +113,21 @@ Set-Location $InstallPath
 npm install selfsigned --no-save --silent
 
 $certScript = @'
-const selfsigned = require("selfsigned");
-const fs = require("fs");
-const pems = selfsigned.generate([{ name: "commonName", value: "localhost" }], { days: 365 });
-fs.writeFileSync("ssl/key.pem", pems.private);
-fs.writeFileSync("ssl/cert.pem", pems.cert);
-console.log("Certificado gerado.");
+(async () => {
+  const selfsigned = require("selfsigned");
+  const fs = require("fs");
+  const pems = await selfsigned.generate([{ name: "commonName", value: "localhost" }], { days: 365 });
+  fs.writeFileSync("ssl/key.pem", pems.private);
+  fs.writeFileSync("ssl/cert.pem", pems.cert);
+  console.log("Certificado gerado.");
+})();
 '@
 $certScript | node --input-type=commonjs -
 
+if (-not (Test-Path (Join-Path $InstallPath "ssl\cert.pem"))) {
+    Write-Host "ERRO: certificado SSL nao foi gerado (ssl/cert.pem ausente)"
+    exit 1
+}
 Write-Host "Certificado SSL gerado"
 
 ###########################################
